@@ -5,6 +5,8 @@ import (
 	"math/big"
 )
 
+// NegativeHeadsError detects whether a number of heads os negative.
+// Protects against underflow
 type NegativeHeadsError struct{}
 
 func (*NegativeHeadsError) Error() string {
@@ -16,8 +18,8 @@ func main() {
 
 	for treeSize < 6 {
 		heads := createBeginningTree(treeSize)
-		fmt.Println(heads)
-		fmt.Println(processTree(heads))
+		fmt.Printf("Beginning Hydra Heads shape: %s\n", heads)
+		fmt.Printf("Final number of rounds taken: %s\n\n", processTree(heads))
 		treeSize++ 
 	}
 }
@@ -43,7 +45,7 @@ func processTree (heads []*big.Int) (*big.Int) {
 		// This is just a while loop, as Go doesn't have a separate keyword
 
 		// If you want to see the "moves"
-		fmt.Println(heads)
+		fmt.Printf("Hydra head shape is: %s, at round: %s.\n", heads, tempCount)
 		count.Add(big.NewInt(0), tempCount)
 		heads, tempCount = removeLowest(heads, count)
 	}
