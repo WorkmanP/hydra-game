@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math/big"
 )
 
 type NegativeHeadsError struct{}
@@ -12,86 +13,127 @@ func (*NegativeHeadsError) Error() string {
 }
 func main() {
 	treeSize := 0
-	for treeSize < 4 {
-		heads, stubs := createBeginningTree(treeSize)
-		fmt.Println(heads, stubs)
-		fmt.Println(processTree(heads, stubs))
-		treeSize ++ 
+
+	for treeSize < 6 {
+		heads := createBeginningTree(treeSize)
+		fmt.Println(heads)
+		fmt.Println(processTree(heads))
+		treeSize++ 
 	}
 }
 
-func createBeginningTree(treeSize int) ([]int, []int) {
-	heads := make([]int, 0)
-	stubs := make([]int, 0)
+func createBeginningTree(treeSize int) []*big.Int {
+	heads := make([]*big.Int, 0)
 	for i := 0; i <= treeSize; i++ {
 		if i != treeSize {
-			heads = append(heads, 0)
-			stubs = append(stubs, 1)
+			heads = append(heads, big.NewInt(0))
 		} else {
-			heads = append(heads, 1)
-			stubs = append(stubs, 0)
+			heads = append(heads, big.NewInt(1))
 		}
 	}
-	return heads, stubs
+	return heads
 }
 
-func processTree (heads, stubs []int) (int) {
-	count := 1
-	heads, stubs, tempCount := removeLowest(heads, stubs, count)
-
+func processTree (heads []*big.Int) (*big.Int) {
+	count := big.NewInt(1)
+	heads, tempCount := removeLowest(heads, count)
 	// If the count is the same, nothing has changed, so the heads list is
 	// empty...
-	for count != tempCount {
+	for count.Cmp(tempCount) != 0 {
 		// This is just a while loop, as Go doesn't have a separate keyword
-		count = tempCount
-		heads, stubs, tempCount = removeLowest(heads, stubs, count)
+
+		// If you want to see the "moves"
+		fmt.Println(heads)
+		count.Add(big.NewInt(0), tempCount)
+		heads, tempCount = removeLowest(heads, count)
 	}
 
 	// As it finds the current step, the number required to kill the hydra
 	// is one less...
-	return count-1
+	count.Sub(count, big.NewInt(1))
+	return count
 }
-func removeLowest (heads, stubs []int, count int) ([]int, []int, int) {
+func removeLowest (heads []*big.Int, count *big.Int) ([]*big.Int, *big.Int) {
+	// Avoiding pointer collision
+	newCount := big.NewInt(0)
+	newCount.Add(newCount, count)
+
+	// ONLY USE THESE FOR COMPARISON / INCREMENT
+	// DO NOT ASSIGN TO LISTS	
+	bigOne := big.NewInt(1)
+	bigZero := big.NewInt(0)
+
 	for i, val := range heads {
-		if i == 0 && val < 0 {
+		if val.Cmp(bigZero) == -1 {
 			panic(&NegativeHeadsError{})
 		}
-		if i == 0 && val != 0 {
-			// Heads that don't generate others can be killed in
-			// one step. Killing them all at once reduces load times
-			count += heads[0]
-			heads[0] = 0
-			return heads, stubs, count
-		}
 
-		if val == 0 {
+		if val.Cmp(bigZero) == 0 {
 			// No heads, move up the tree
 			continue
 		}
-		// We have found a head so kill it
-		heads[i]--
 
-		// Increase the number of heads below by the step count
-		heads[i-1] += count
+		if i == 0 {
+			// Heads that don't generate others can be killed in
+			// one step. Killing them all at once reduces load times
+			newCount.Add(newCount, heads[0])
 
-		// Increase the count
-		count++
+			// Dont set it here as it is a pointer and so could change
+			// big Zero
+			heads[0] = big.NewInt(0)
+			return heads, newCount
+		} 
 
-		// Check whether we have to convert the node to a head
 		headsAbove := 0
 		for j, val := range (heads) {
 			if j <= i {continue}
-			headsAbove += val
+			if val.Cmp(bigZero) != 0 {
+				headsAbove = 1
+				break
+			}
 		}
+
+		if i == 1 {
+			// Generic reduction formula for N heads at connected node 1
+			newCount = simplifyHeightOne(val, count)
+			heads[i] = big.NewInt(0)
+			if headsAbove == 0 {
+				// Because we destroy the last node that remains
+				newCount = big.NewInt(0).Add(newCount, big.NewInt(1))
+			}
+			return heads, newCount
+		}
+
+		// We have found a head so kill it
+		heads[i].Sub(heads[i], bigOne)
+
+		// Increase the number of heads below by the step count
+		heads[i-1].Add(heads[i-1], count)
+
+		// Increase the count
+		newCount = big.NewInt(0).Add(newCount, bigOne)
 		
-		if val == 1 && headsAbove == 0{
+		if heads[i].Cmp(bigZero) == 0 && headsAbove == 0{
 			// Add the new stub created to the list of heads
-			heads[i-1]++
-			stubs[i-1]=0
+			heads[i-1].Add(heads[i-1], bigOne)
 		}
-		fmt.Println(heads, count)
-		return heads, stubs, count
+		return heads, newCount
 	}
+
 	// If there are no heads left, return the input
-	return heads, stubs, count
+	return heads, newCount
+}
+
+func simplifyHeightOne(heads *big.Int, count *big.Int) (*big.Int) {
+	newCount := big.NewInt(0).Add(big.NewInt(0), count)
+
+	bigOne := big.NewInt(1)	
+	bigTwo := big.NewInt(2)
+
+	twoExp := big.NewInt(0).Exp(bigTwo, heads, nil)
+	bracket := big.NewInt(0).Add(newCount, bigOne)
+
+	result := big.NewInt(0).Mul(twoExp, bracket)
+	
+	return big.NewInt(0).Sub(result, bigOne)
 }
